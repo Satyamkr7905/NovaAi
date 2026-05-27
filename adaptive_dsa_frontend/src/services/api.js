@@ -63,7 +63,8 @@ const request = async (path, { method = "GET", body, headers, timeoutMs = 60_000
     }
     return res.json();
   } catch (err) {
-    if (isNetworkError(err) || timedout) {
+    const timedOut = err?.name === "AbortError";
+    if (isNetworkError(err) || timedOut) {
       const nicer = new Error(
         `Can't reach the API at ${API_BASE}. Make sure the FastAPI server is up and CORS_ORIGINS includes this site.`,
       );
