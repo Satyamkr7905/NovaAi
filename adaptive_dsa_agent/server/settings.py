@@ -113,7 +113,9 @@ def cors_list() -> list[str]:
     # parse CORS_ORIGINS and strip any '*' — '*' + credentials is unsafe so we
     # refuse it instead of letting the browser complain later.
     raw = get_api_settings().cors_origins
-    items = [o.strip() for o in raw.split(",") if o.strip()]
+    # normalize trailing slash because browser Origin header is scheme+host(+port)
+    # without path, e.g. "https://example.com" (not "https://example.com/").
+    items = [o.strip().rstrip("/") for o in raw.split(",") if o.strip()]
     safe = [o for o in items if o != "*"]
     if len(safe) != len(items):
         _log.warning(
