@@ -55,6 +55,9 @@ class ApiSettings(BaseSettings):
     gmail_smtp_timeout_seconds: int = 20
     gmail_user: str = ""
     gmail_app_password: str = ""
+    # Optional transactional email provider for production (recommended on Render).
+    resend_api_key: str = ""
+    resend_from_email: str = ""
 
     otp_ttl_minutes: int = 10
 
@@ -65,6 +68,9 @@ class ApiSettings(BaseSettings):
     # behind a proxy you want IP-level limits too.
     otp_send_cooldown_seconds: int = 30
     otp_send_daily_max: int = 20
+    # Emergency switch: allow returning OTP inline in production when email
+    # delivery fails. Keep false for normal operation.
+    otp_allow_inline_fallback_in_prod: bool = False
 
     cors_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
 

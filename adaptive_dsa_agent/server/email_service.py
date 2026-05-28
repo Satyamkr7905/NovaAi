@@ -1,10 +1,13 @@
-# Send OTP email via Gmail SMTP using an App Password.
+# Send OTP email via Resend API (preferred) or Gmail SMTP fallback.
 
 from __future__ import annotations
 
 import smtplib
 import ssl
+import urllib.error
+import urllib.request
 from email.message import EmailMessage
+import json
 from smtplib import SMTPAuthenticationError, SMTPException
 
 from .settings import get_api_settings
@@ -15,8 +18,55 @@ class SmtpNotConfiguredError(Exception):
     pass
 
 
+def _send_via_resend(to_addr: str, code: str) -> bool:
+    s = get_api_settings()
+    api_key = (s.resend_api_key or "").strip()
+    from_email = (s.resend_from_email or "").strip()
+    if not api_key or not from_email:
+        return False
+
+    payload = {
+        "from": from_email,
+        "to": [to_addr],
+        "subject": "Your MananAI sign-in code",
+        "text": (
+            f"Your MananAI one-time code is: {code}\n\n"
+            "It expires in a few minutes. If you didn't request this, ignore this email."
+        ),
+    }
+    body = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        "https://api.resend.com/emails",
+        data=body,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=s.gmail_smtp_timeout_seconds) as resp:
+            if 200 <= getattr(resp, "status", 0) < 300:
+                return True
+    except urllib.error.HTTPError as e:
+        details = ""
+        try:
+            details = e.read().decode("utf-8", errors="ignore")
+        except Exception:
+            details = ""
+        raise RuntimeError(
+            f"Resend API rejected the request ({e.code}). Check RESEND_API_KEY and RESEND_FROM_EMAIL. {details}"
+        ) from e
+    except urllib.error.URLError as e:
+        raise RuntimeError(f"Could not reach Resend API: {e.reason!s}") from e
+    return False
+
+
 def send_otp_email(to_addr: str, code: str) -> None:
     s = get_api_settings()
+    if _send_via_resend(to_addr, code):
+        return
+
     # google app passwords often get copied with spaces; SMTP wants 16 chars, no spaces.
     app_pw = (s.gmail_app_password or "").replace(" ", "").strip()
     user = (s.gmail_user or "").strip()

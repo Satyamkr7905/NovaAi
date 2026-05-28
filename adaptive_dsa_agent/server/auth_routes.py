@@ -146,11 +146,29 @@ def _issue_otp(db: Session, email: str) -> tuple[str, str, str | None]:
             code,
         )
     except Exception as exc:
+        # In local dev, SMTP can fail due to wrong app password, blocked ports,
+        # or temporary provider issues. Keep auth flow usable by returning OTP
+        # inline. In production this is disabled by default, but can be enabled
+        # temporarily with OTP_ALLOW_INLINE_FALLBACK_IN_PROD=true.
         log.exception("Failed to send OTP email")
-        raise HTTPException(
-            status_code=500,
-            detail="Could not send the sign-in code right now. Please try again.",
-        ) from exc
+        if settings_.is_prod() and not settings_.otp_allow_inline_fallback_in_prod:
+            raise HTTPException(
+                status_code=500,
+                detail="Could not send the sign-in code right now. Please try again.",
+            ) from exc
+        if settings_.is_prod():
+            return (
+                "Email delivery is temporarily unavailable. Use the one-time "
+                "code shown in the app and contact support.",
+                "dev_inline",
+                code,
+            )
+        return (
+            "Email delivery failed in APP_ENV=dev. Use the one-time code shown "
+            "in the app to continue.",
+            "dev_inline",
+            code,
+        )
 
 
 @router.post("/send-otp")
