@@ -27,7 +27,7 @@ They talk to each other over HTTP. For local development, the API runs on `https
 
 ---
 
-## How it works (in plain English)
+## How it works
 
 1. **You sign up** with your email and a password. We email you a 6-digit code to prove the address is yours.
 2. **The tutor picks a question** that's just hard enough — not so easy you're bored, not so hard you give up.
