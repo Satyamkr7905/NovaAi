@@ -85,7 +85,8 @@ export default function Signup() {
         password,
         name: name.trim() || undefined,
       });
-      router.push("/verify-otp?mode=signup");
+      // OTP verify step disabled — AuthContext redirects to /dashboard on success.
+      // router.push("/verify-otp?mode=signup");
     } catch {
       // toast surfaced by AuthContext
     } finally {
@@ -98,7 +99,7 @@ export default function Signup() {
       <div className="animate-fade-in">
         <h2 className="text-2xl font-semibold text-slate-900 dark:text-slate-100 tracking-tight">Create your account</h2>
         <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">
-          We'll email a 6-digit code to verify that Gmail address is yours.
+          Create an account with your email and password to get started.
         </p>
 
         <form onSubmit={onSubmit} className="mt-8 flex flex-col gap-4">
@@ -219,7 +220,7 @@ export default function Signup() {
           )}
 
           <button type="submit" className="btn-primary w-full mt-2" disabled={!canSubmit}>
-            {submitting ? <Loader size="sm" /> : "Create account & send code"}
+            {submitting ? <Loader size="sm" /> : "Create account"}
           </button>
         </form>
 
@@ -258,7 +259,6 @@ export default function Signup() {
           </Link>
         </p>
         <p className="mt-4 text-xs text-slate-400 dark:text-slate-500 leading-relaxed">
-          By creating an account you agree to receive a one-time verification email at the address above.
           We store only a bcrypt hash of your password — never the plaintext.
         </p>
       </div>

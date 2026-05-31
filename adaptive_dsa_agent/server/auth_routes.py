@@ -185,14 +185,12 @@ def send_otp(body: SendOtpBody, db: Session = Depends(get_session)):
 
 @router.post("/signup")
 def signup(body: SignupBody, db: Session = Depends(get_session)):
-    # start an email+password account. sends an OTP to prove the email is real.
-    #  - unknown email -> create unverified user w/ password_hash, send OTP.
-    #  - exists but unverified -> update password_hash, resend OTP.
+    # Direct email+password signup (OTP disabled temporarily — re-enable later).
+    #  - unknown email -> create verified user w/ password_hash, issue JWT.
+    #  - exists but unverified -> update password_hash, mark verified, issue JWT.
     #  - exists and verified -> 409 (tell them to sign in or reset).
     email = body.email.strip().lower()
 
-    # check "already signed up" BEFORE rate limiting so a returning user gets
-    # a proper "please sign in" instead of "too many requests".
     user = db.query(User).filter(User.email == email).first()
     if user and getattr(user, "email_verified", False) and user.password_hash:
         raise HTTPException(
@@ -200,29 +198,42 @@ def signup(body: SignupBody, db: Session = Depends(get_session)):
             detail="An account with this email already exists. Please sign in.",
         )
 
-    _check_send_rate(email)
     pwd_hash = hash_password(body.password)
     name = (body.name or "").strip() or email.split("@")[0]
     if user is None:
-        user = User(email=email, name=name, password_hash=pwd_hash, email_verified=False)
+        user = User(email=email, name=name, password_hash=pwd_hash, email_verified=True)
         db.add(user)
     else:
         user.name = user.name or name
         user.password_hash = pwd_hash
-        user.email_verified = False
+        user.email_verified = True
         db.add(user)
     db.commit()
+    db.refresh(user)
+    ensure_learning_row(db, user)
+    return _issue(user)
 
-    msg, delivery, dev_code = _issue_otp(db, email)
-    out: dict = {
-        "ok": True,
-        "message": "Account created. " + msg,
-        "email": email,
-        "delivery": delivery,
-    }
-    if dev_code is not None:
-        out["devCode"] = dev_code
-    return out
+    # --- OTP signup flow (disabled for now; restore when SMTP is configured) ---
+    # _check_send_rate(email)
+    # if user is None:
+    #     user = User(email=email, name=name, password_hash=pwd_hash, email_verified=False)
+    #     db.add(user)
+    # else:
+    #     user.name = user.name or name
+    #     user.password_hash = pwd_hash
+    #     user.email_verified = False
+    #     db.add(user)
+    # db.commit()
+    # msg, delivery, dev_code = _issue_otp(db, email)
+    # out: dict = {
+    #     "ok": True,
+    #     "message": "Account created. " + msg,
+    #     "email": email,
+    #     "delivery": delivery,
+    # }
+    # if dev_code is not None:
+    #     out["devCode"] = dev_code
+    # return out
 
 
 @router.post("/signup/verify")

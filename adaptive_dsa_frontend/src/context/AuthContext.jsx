@@ -168,36 +168,55 @@ export const AuthProvider = ({ children }) => {
     [router],
   );
 
-  const signup = useCallback(async ({ email, password, name }) => {
-    try {
-      const res = await apiSignup({ email, password, name });
-      setPendingEmail(email);
-      if (typeof window !== "undefined") {
-        if (res?.devCode) {
+  const signup = useCallback(
+    async ({ email, password, name }) => {
+      try {
+        const res = await apiSignup({ email, password, name });
+
+        // Direct signup — server returns token + user (OTP flow disabled for now).
+        if (res?.token && res?.user) {
+          saveSession({ token: res.token, user: res.user });
           try {
-            window.sessionStorage.setItem("adt.devOtp", String(res.devCode));
+            await syncProgressFromServer();
           } catch {
-            /* ignore */
+            /* non-fatal */
           }
-          toast.success(
-            `Your verification code: ${res.devCode}. (SMTP not configured — add GMAIL_USER/GMAIL_APP_PASSWORD in the API .env to receive codes by email.)`,
-            { duration: 8000 },
-          );
-        } else {
-          try {
-            window.sessionStorage.removeItem("adt.devOtp");
-          } catch {
-            /* ignore */
-          }
-          toast.success(res?.message || "Account created. Check your email for the code.");
+          setState({ token: res.token, user: res.user, loading: false });
+          toast.success(`Welcome, ${res.user.name || res.user.email}!`);
+          router.push("/dashboard");
+          return res;
         }
+
+        // --- OTP signup flow (disabled for now; restore when SMTP is configured) ---
+        // setPendingEmail(email);
+        // if (typeof window !== "undefined") {
+        //   if (res?.devCode) {
+        //     try {
+        //       window.sessionStorage.setItem("adt.devOtp", String(res.devCode));
+        //     } catch {
+        //       /* ignore */
+        //     }
+        //     toast.success(
+        //       `Your verification code: ${res.devCode}. (SMTP not configured — add GMAIL_USER/GMAIL_APP_PASSWORD in the API .env to receive codes by email.)`,
+        //       { duration: 8000 },
+        //     );
+        //   } else {
+        //     try {
+        //       window.sessionStorage.removeItem("adt.devOtp");
+        //     } catch {
+        //       /* ignore */
+        //     }
+        //     toast.success(res?.message || "Account created. Check your email for the code.");
+        //   }
+        // }
+        return res;
+      } catch (e) {
+        toast.error(e?.message || "Could not create account.");
+        throw e;
       }
-      return res;
-    } catch (e) {
-      toast.error(e?.message || "Could not create account.");
-      throw e;
-    }
-  }, []);
+    },
+    [router],
+  );
 
   const verifySignupOtp = useCallback(
     async (email, otp) => {
